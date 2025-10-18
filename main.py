@@ -28,10 +28,11 @@ team_assigner = TeamAssigner()
 team_colors_assigned = False
 PLAYER_CLASS_ID = 2       # player
 GOALKEEPER_CLASS_ID = 1   # goalkeeper
+ADDING_TRAJECTORIES = False  # set to True to enable trajectory drawing
 
 # ---------------------- paths ----------------------
 video_path = r"C:\Users\aelsh\Downloads\08fd33_4.mp4"
-output_path = r'E:\Foodball_Analysis_System\outputs\tracked_football_video3.mp4'
+output_path = rf'E:\Foodball_Analysis_System\outputs\tracked_football_video_1, has trajectories: {ADDING_TRAJECTORIES}.mp4'
 
 # make sure output folder exists
 pathlib.Path(output_path).parent.mkdir(parents=True, exist_ok=True)
@@ -60,6 +61,9 @@ CLASS_COLORS = {
     3: (0, 255, 255)  # referee
 }
 
+if ADDING_TRAJECTORIES:
+    trajectories = defaultdict(list)  # {tracker_tid: [(x1, y1), (x2, y2), ...]}
+
 for res in results:
     frame = res.orig_img.copy()
     if res.boxes.id is None:
@@ -87,6 +91,8 @@ for res in results:
     # ---------------------------------------------------------------------------
 
     for (x1, y1, x2, y2), tid, c, conf in zip(boxes, ids, clses, confs):
+
+        # ---------------------------- Draw bounding box + label -----------------------------
         # Use team color for BOTH goalkeepers and players
         if int(c) in (PLAYER_CLASS_ID, GOALKEEPER_CLASS_ID) and team_colors_assigned:
             try:
@@ -97,7 +103,7 @@ for res in results:
                 color = CLASS_COLORS.get(int(c), (200, 200, 200))
         else:
             color = CLASS_COLORS.get(int(c), (200, 200, 200))
-
+        
         # thin box
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 1)
 
@@ -128,6 +134,20 @@ for res in results:
         # Second line: ID
         cv2.putText(frame, id_text, (x1 + 2, y_text - 2),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 2)
+        # ------------------------------------------------------------------------------------
+
+
+
+        # -------------------------- Add to trajectory (if enabled) --------------------------
+        if ADDING_TRAJECTORIES and int(c) in (PLAYER_CLASS_ID, GOALKEEPER_CLASS_ID):
+            cx, cy = int((x1 + x2) / 2), int((y1 + y2) / 2)
+            trajectories[tid].append((cx, cy))
+
+            if len(trajectories[tid]) >= 2:
+                for j in range(1, len(trajectories[tid])):
+                    cv2.line(frame, trajectories[tid][j - 1], trajectories[tid][j], color, 2)
+        # ------------------------------------------------------------------------------------
+
 
     out.write(frame)
 
